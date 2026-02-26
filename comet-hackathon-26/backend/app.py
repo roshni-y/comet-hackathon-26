@@ -6,7 +6,7 @@ from docx import Document
 import fitz  # pymupdf
 
 app = Flask(__name__)
-CORS(app)
+CORS(app) # 2. This line is mandatory to talk to React
 
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
