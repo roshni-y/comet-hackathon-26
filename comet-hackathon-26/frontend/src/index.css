@@ -1,8 +1,20 @@
 @import "tailwindcss";
 
-/* That's it! Tailwind v4 handles the rest automatically */
-
 body {
   margin: 0;
+  padding: 0;
   font-family: 'Inter', sans-serif;
+  overflow: hidden;
+}
+
+/* Custom neat scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #3ca3a0;
+  border-radius: 10px;
 }
