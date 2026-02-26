@@ -1,1 +1,0 @@
-# comet-hackathon-26
