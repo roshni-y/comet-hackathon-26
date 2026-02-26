@@ -35,11 +35,6 @@ Azure Neural Voice: High-quality professional audio responses powered by Microso
 Contextual Tabs: Separate workspaces for Physics, Chemistry, and Biology.
 
 📂 Project Structure
-code
-Text
-download
-content_copy
-expand_less
 AskMyNotes/
 ├── backend/                # Flask Server (Python)
 │   ├── uploads/            # User-specific private file storage
@@ -54,7 +49,6 @@ AskMyNotes/
 │   ├── tailwind.config.js  # Style configuration
 │   └── package.json        # Frontend dependencies
 └── README.md
-🛠️ Tech Stack
 
 Frontend:
 
