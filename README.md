@@ -1,39 +1,24 @@
 📚 AskMyNotes: AI-Powered Study Workspace by Team Comet
-
-AskMyNotes is a professional study assistant inspired by Google NotebookLM. It allows users to upload their personal study materials (PDF, DOCX, TXT) and interact with them using a "Strict AI" that only answers based on the provided content. Featuring a modern Teal-themed dashboard, it includes automated quiz generation and Azure-powered voice-to-voice conversation.
-
-![alt text](https://img.shields.io/badge/Theme-Teal%20%26%20Clean-3ca3a0)
-
-
-![alt text](https://img.shields.io/badge/AI-OpenAI%20%2B%20Azure-blue)
-
-
-![alt text](https://img.shields.io/badge/Users-Multi--User%20Library-green)
-
+AskMyNotes is a professional study assistant inspired by Google NotebookLM. It allows users to upload personal study materials (PDF, DOCX, TXT) and interact with them using a "Strict AI" model that prevents hallucinations by grounding all answers in your uploaded content.
 🌟 Key Features
-
-Multi-User Workspace: Secure login system with private libraries for different users.
-
-Cross-Format Support: Attach and index .pdf, .docx, and .txt files seamlessly.
-
-Strict Note Adherence: The AI is locked to your notes. If the answer isn't in your files, it won't hallucinate or guess.
-
-Studio Mode:
-
-5 MCQs: Generates a practice quiz with answers and explanations.
-
-Short Answers: Extracts 3 key direct questions and answers.
-
-Summary: Provides a bulleted takeaways list of your entire document.
-
-Speech-to-Speech:
-
-Voice Input: Ask questions using your microphone.
-
-Azure Neural Voice: High-quality professional audio responses powered by Microsoft Azure.
-
-Contextual Tabs: Separate workspaces for Physics, Chemistry, and Biology.
-
+ * Multi-User Workspace: Secure login system with private, categorized libraries.
+ * Cross-Format Support: Seamlessly index .pdf, .docx, and .txt files.
+ * Zero-Hallucination RAG: The AI is strictly locked to your notes. If the answer isn't in your files, it won't guess.
+ * Studio Mode (One-Click Generation):
+   * 5 MCQs: Automatic practice quizzes with answers and explanations.
+   * Short Answers: Extraction of 3 key direct questions and answers.
+   * Summary: Bulleted takeaways of the entire document.
+ * Speech-to-Speech:
+   * Voice Input: Ask questions hands-free via microphone.
+   * Azure Neural Voice: High-quality professional audio responses powered by Microsoft Azure.
+ * Contextual Tabs: Dedicated workspaces for Physics, Chemistry, and Biology.
+🛠️ Tech Stack
+| Component | Technology |
+|---|---|
+| Frontend | React.js (Vite), Tailwind CSS v4, Lucide React |
+| Backend | Flask (Python), OpenAI API (GPT-3.5/4) |
+| Voice | Azure Cognitive Services (Neural TTS), Web Speech API |
+| Parsing | PyMuPDF, Python-Docx, NLTK |
 📂 Project Structure
 AskMyNotes/
 ├── backend/                # Flask Server (Python)
@@ -50,102 +35,39 @@ AskMyNotes/
 │   └── package.json        # Frontend dependencies
 └── README.md
 
-Frontend:
-
-React.js (Vite)
-
-Tailwind CSS (Teal/White Minimalist UI)
-
-Lucide React (Iconography)
-
-Web Speech API (Speech-to-Text)
-
-Backend:
-
-Flask (Python)
-
-OpenAI API (GPT-3.5/4 for RAG)
-
-Microsoft Azure Cognitive Services (Neural TTS)
-
-PyMuPDF & Python-Docx (File Parsing)
-
-NLTK (Text Processing)
-
 🚀 Installation & Setup
 1. Clone the Repository
-code
-Bash
-download
-content_copy
-expand_less
 git clone https://github.com/roshni-y/comet-hackathon-26.git
 cd comet-hackathon-26
+
 2. Backend Setup
-code
-Bash
-download
-content_copy
-expand_less
 cd backend
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
+Configure Environment Variables:
 Create a .env file in the backend/ folder:
-
-code
-Text
-download
-content_copy
-expand_less
 OPENAI_API_KEY=your_openai_key
 AZURE_SPEECH_KEY=your_azure_key
 AZURE_SPEECH_REGION=your_region
 
 Run the server:
-
-code
-Bash
-download
-content_copy
-expand_less
 python app.py
+
 3. Frontend Setup
-code
-Bash
-download
-content_copy
-expand_less
 cd ../frontend
 npm install
-
-Run the React app:
-
-code
-Bash
-download
-content_copy
-expand_less
 npm run dev
+
 📖 Usage Guide
-
-Login: Use default credentials (e.g., roshni / roshni123).
-
-Select Subject: Choose between Physics, Chemistry, or Biology from the top tabs.
-
-Upload Notes: Click "Add Notes" to upload your study material.
-
-Interact:
-
-Type a question in the bar.
-
-Or click the Mic icon to speak your question.
-
-Studio Mode: Click buttons on the right sidebar to instantly generate structured MCQs or Summaries.
-
-New Chat: Use the "New Chat" button to wipe the current session and start fresh.
-
+ * Login: Access the dashboard using your credentials.
+ * Select Subject: Toggle between Physics, Chemistry, or Biology tabs.
+ * Upload: Use the "Add Notes" button to upload your documents.
+ * Interact: * Type questions in the chat bar or use the Mic icon for voice queries.
+   * Use the Sidebar buttons to trigger "Studio Mode" for instant summaries or quizzes.
+ * Reset: Use "New Chat" to clear the session and start a new topic.
 🔒 Security Note
-
-This project uses .env files to store API keys. Never commit your .env file to GitHub. It is already included in the .gitignore to prevent accidental leaks.
+> Important: This project uses .env files for API keys. This file is included in .gitignore to prevent accidental leaks. Never commit your actual API keys to GitHub.
+> 
+Created with ❤️ by Team Comet
