@@ -11,6 +11,10 @@ from werkzeug.utils import secure_filename
 from openai import OpenAI
 import nltk
 from nltk.tokenize import word_tokenize
+from dotenv import load_dotenv
+
+# 1. LOAD ENVIRONMENT VARIABLES
+load_dotenv()
 
 # Setup NLP tools
 try:
@@ -20,6 +24,11 @@ except LookupError:
 
 app = Flask(__name__)
 CORS(app)
+
+# 2. CONFIGURATION & AI CLIENT
+# It tries to get from .env first; if not found, it uses your provided key
+api_key = os.getenv("OPENAI_API_KEY") or "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"
+client = OpenAI(api_key=api_key)
 
 # --- CONFIGURATION ---
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -37,40 +46,48 @@ USERS = {"roshni": "roshni123", "sujal": "sujal123", "ronak": "ronak123"}
 def extract_text(file_path, filename):
     ext = filename.split('.')[-1].lower()
     text = ""
-    try:
-        if ext == 'pdf':
-            with fitz.open(file_path) as doc:
-                for page in doc: text += page.get_text()
-        elif ext == 'docx':
-            doc = Document(file_path)
-            text = "\n".join([para.text for para in doc.paragraphs])
-        elif ext == 'txt':
-            with open(file_path, 'r', encoding='utf-8') as f: text = f.read()
-    except Exception as e: print(f"Error: {e}")
+    
+    if ext == 'pdf':
+        with fitz.open(file_path) as doc:
+            for page in doc:
+                text += page.get_text()
+    elif ext == 'docx':
+        doc = Document(file_path)
+        text = "\n".join([para.text for para in doc.paragraphs])
+    elif ext == 'txt':
+        with open(file_path, 'r', encoding='utf-8') as f:
+            text = f.read()
     return text
 
-def generate_local_mcqs(context):
-    sentences = [s.strip() for s in re.split(r'(?<=[.!?]) +', context) if len(s.strip()) > 60]
-    fact_sentences = [s for s in sentences if any(p in s.lower() for p in [" is ", " are ", " called ", " consists of "])]
-    if len(fact_sentences) < 5: fact_sentences = sentences[:10]
+# -----------------------------------------
+# KEYWORD MATCHING LOGIC (STRICT)
+# -----------------------------------------
+def find_best_match(question, chunks):
+    # 1. Clean the question into significant keywords
+    stop_words = set(stopwords.words('english'))
+    words = word_tokenize(question.lower())
+    # Only keep words that aren't "the, is, at" and are longer than 2 letters
+    keywords = [w for w in words if w.isalnum() and w not in stop_words and len(w) > 2]
     
-    random.shuffle(fact_sentences)
-    blocks = []
-    for i, sent in enumerate(fact_sentences[:5]):
-        words = [w.strip(".,()\"") for w in sent.split() if len(w) > 6]
-        if not words: continue
-        ans = random.choice(words)
-        ques = sent.replace(ans, "__________", 1)
+    if not keywords: return None
+
+    best_chunk = None
+    max_score = 0
+
+    for item in chunks:
+        chunk_text = item['text'].lower()
+        # Count how many unique keywords appear in this chunk
+        score = sum(1 for word in keywords if word in chunk_text)
         
-        all_words = list(set([w.strip(".,()\"") for w in context.split() if len(w) > 6 and w.lower() != ans.lower()]))
-        random.shuffle(all_words)
-        opts = random.sample(all_words, 3) + [ans]
-        random.shuffle(opts)
-        
-        opt_fmt = "\n".join([f"{['A','B','C','D'][j]}) {o}" for j, o in enumerate(opts)])
-        blocks.append(f"**QUESTION {i+1}**\n{ques}\n\n{opt_fmt}\n\n**Correct Answer:** {ans}")
-    
-    return "\n\n---\n\n".join(blocks)
+        if score > max_score:
+            max_score = score
+            best_chunk = item
+
+    # Threshold: At least 40% of unique keywords must match to prevent "guessing"
+    threshold = len(keywords) * 0.4
+    if max_score >= max(1, threshold):
+        return best_chunk
+    return None
 
 # -----------------------------------------
 # ROUTES
@@ -96,77 +113,39 @@ def upload():
 
         content = extract_text(fpath, fname)
         if user not in USER_KNOWLEDGE: USER_KNOWLEDGE[user] = {}
-        if subj not in USER_KNOWLEDGE[user]: USER_KNOWLEDGE[user][subj] = []
+        if subject not in USER_KNOWLEDGE[user]: USER_KNOWLEDGE[user][subject] = []
         
-        # Smart Chunking
-        lines = [l.strip() for l in content.split('\n') if len(l.strip()) > 10]
-        curr = ""
-        for l in lines:
-            curr += l + " "
-            if len(curr) > 600:
-                USER_KNOWLEDGE[user][subj].append(curr.strip())
-                curr = ""
-        if curr: USER_KNOWLEDGE[user][subj].append(curr)
-        return jsonify({"status": "success"})
-    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
+        USER_KNOWLEDGE[user][subject].extend(paragraphs)
+
+        return jsonify({"status": "success", "message": f"Learned from {filename}"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/ask", methods=["POST"])
 def ask():
     data = request.json
-    u, subj, ques = data.get("user").lower(), data.get("subject").lower(), data.get("question").strip()
-    
-    if ques.lower() in ["hi", "hello", "hey"]:
-        return jsonify({"answer": f"Hi {u.capitalize()}, I'm ready. What would you like to study in {subj} today?"})
+    user = data.get("user", "").lower()
+    subject = data.get("subject", "").lower()
+    question = data.get("question", "")
 
-    notes = USER_KNOWLEDGE.get(u, {}).get(subj, [])
-    if not notes: return jsonify({"answer": "Please upload notes first!"})
+    # Check for greetings
+    if question.lower().strip() in ["hi", "hello", "hey"]:
+        return jsonify({"answer": f"Hi {user.capitalize()}, I'm ready. Ask me anything about your {subject} notes!"})
 
-    try:
-        # ATTEMPT AI
-        resp = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "system", "content": f"Strict tutor for {subj}. Use notes only. Format with clear spacing."},
-                      {"role": "user", "content": f"NOTES:\n{' '.join(notes)[:5000]}\n\nQ: {ques}"}]
-        )
-        return jsonify({"answer": resp.choices[0].message.content, "citation": "AI Verified"})
-    except:
-        # LOCAL FALLBACK
-        q_words = set([w.lower() for w in word_tokenize(ques) if len(w) > 3])
-        best_idx, max_s = -1, 0
-        for i, c in enumerate(notes):
-            s = sum(1 for w in q_words if w in c.lower())
-            if s > max_s: max_s, best_idx = s, i
-        
-        if best_idx != -1:
-            ans = notes[best_idx]
-            if best_idx + 1 < len(notes): ans += "\n\n" + notes[best_idx+1]
-            return jsonify({"answer": f"💡 **Notes Analysis:**\n\n{ans}", "citation": "Local Engine"})
-        return jsonify({"answer": "No direct match found in your notes. [Strict Mode]"})
+    chunks = USER_KNOWLEDGE.get(user, {}).get(subject, [])
+    match = find_best_match(question, chunks)
 
-@app.route("/generate-studio", methods=["POST"])
-def generate_studio():
-    data = request.json
-    u, subj, task = data.get("user").lower(), data.get("subject").lower(), data.get("task")
-    notes = USER_KNOWLEDGE.get(u, {}).get(subj, [])
-    if not notes: return jsonify({"answer": "Upload notes first!"})
-    ctx = "\n\n".join(notes)
+    if match:
+        return jsonify({
+            "answer": match['text'],
+            "citation": match['ref'],
+            "confidence": "High"
+        })
 
-    try:
-        prompts = {"mcq": "5 MCQs with answers.", "short": "2 Short Q&A pairs.", "summary": "Detailed bullet summary."}
-        resp = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": f"Text: {ctx[:4000]}\nTask: {prompts[task]}. Use double newlines between items."}]
-        )
-        return jsonify({"answer": resp.choices[0].message.content})
-    except:
-        if task == "mcq": return jsonify({"answer": f"❓ **LOCAL PRACTICE QUIZ**\n\n{generate_local_mcqs(ctx)}"})
-        elif task == "summary":
-            res = "\n\n".join([f"• {n[:200]}..." for n in notes[:5]])
-            return jsonify({"answer": f"📌 **LOCAL SUMMARY**\n\n{res}"})
-        else:
-            defs = [n for n in notes if " is " in n.lower()][:2]
-            res = "\n\n".join([f"**Concept**\nExplain this: {d}" for d in defs])
-            return jsonify({"answer": f"📝 **KEY CONCEPTS**\n\n{res}"})
+    return jsonify({
+        "answer": f"I'm sorry, I couldn't find a specific match for that in your {subject} notes. [Strict Mode]",
+        "citation": None
+    })
 
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, port=5000)
