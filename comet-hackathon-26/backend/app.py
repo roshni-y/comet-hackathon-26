@@ -1,67 +1,74 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS  # <--- CRITICAL FIX
 import os
 from werkzeug.utils import secure_filename
-from config import UPLOAD_FOLDER, ALLOWED_EXTENSIONS
-from utils.pdf_processor import process_pdf
-from utils.keyword_matcher import search_answer
+from docx import Document
+import fitz  # pymupdf
 
 app = Flask(__name__)
+CORS(app)
 
+UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs("processed", exist_ok=True)
 
+# This would typically be a database or a structured folder
+knowledge_base = {
+    "physics": [],
+    "chemistry": [],
+    "biology": []
+}
 
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-
+def process_file(subject, file_path, filename):
+    ext = filename.split('.')[-1].lower()
+    text_chunks = []
+    
+    if ext == 'pdf':
+        doc = fitz.open(file_path)
+        for page_num, page in enumerate(doc):
+            text_chunks.append({"text": page.get_text(), "ref": f"{filename} (Pg {page_num + 1})"})
+    elif ext == 'docx':
+        doc = Document(file_path)
+        for i, para in enumerate(doc.paragraphs):
+            if para.text.strip():
+                text_chunks.append({"text": para.text, "ref": f"{filename} (Para {i + 1})"})
+    elif ext == 'txt':
+        with open(file_path, 'r', encoding='utf-8') as f:
+            text_chunks.append({"text": f.read(), "ref": f"{filename}"})
+    
+    knowledge_base[subject.lower()].extend(text_chunks)
 
 @app.route("/upload", methods=["POST"])
-def upload_file():
-    try:
-        subject = request.form.get("subject")
-        file = request.files.get("file")
-
-        if not subject or not file:
-            return jsonify({"error": "Missing subject or file"}), 400
-
-        if not allowed_file(file.filename):
-            return jsonify({"error": "Only PDF files allowed"}), 400
-
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(file_path)
-
-        process_pdf(subject, file_path, filename)
-
-        return jsonify({"message": "File uploaded and processed successfully"})
-
-    except Exception:
-        return jsonify({"error": "File processing failed"}), 500
-
+def upload():
+    subject = request.form.get("subject")
+    file = request.files.get("file")
+    if not file or not subject:
+        return jsonify({"status": "error", "message": "Missing data"}), 400
+    
+    filename = secure_filename(file.filename)
+    path = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(path)
+    
+    process_file(subject, path, filename)
+    return jsonify({"status": "success", "message": f"{filename} processed for {subject}"})
 
 @app.route("/ask", methods=["POST"])
-def ask_question():
-    try:
-        data = request.json
-        subject = data.get("subject")
-        question = data.get("question")
-
-        if not subject or not question:
-            return jsonify({"error": "Missing subject or question"}), 400
-
-        result = search_answer(subject, question)
-
-        if result is None:
+def ask():
+    data = request.json
+    subject = data.get("subject").lower()
+    question = data.get("question").lower()
+    
+    # Simple Keyword Matcher (Strict Note Logic)
+    notes = knowledge_base.get(subject, [])
+    for chunk in notes:
+        # If any keyword from question exists in note
+        if any(word in chunk['text'].lower() for word in question.split() if len(word) > 3):
             return jsonify({
-                "answer": f"Not found in your notes for {subject}"
+                "answer": chunk['text'][:500] + "...", 
+                "citation": chunk['ref'],
+                "confidence": "High"
             })
-
-        return jsonify(result)
-
-    except Exception:
-        return jsonify({"error": "Failed to process question"}), 500
-
+            
+    return jsonify({"answer": f"Not found in your notes for {subject}. [Strict Mode Active]"})
 
 if __name__ == "__main__":
-    app.run(debug=True)
-    
+    app.run(debug=True, port=5000)

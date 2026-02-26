@@ -1,49 +1,30 @@
 import os
-import json
-from config import PROCESSED_FOLDER, MATCH_THRESHOLD
-from utils.text_cleaner import extract_keywords, clean_text
+from config import PROCESSED_FOLDER
+
 
 def search_answer(subject, question):
-    keywords = extract_keywords(question)
+    processed_path = os.path.join(PROCESSED_FOLDER, f"{subject}.txt")
 
-    if not keywords:
+    if not os.path.exists(processed_path):
         return None
 
-    best_match = None
-    best_score = 0
+    with open(processed_path, "r", encoding="utf-8") as f:
+        text = f.read()
 
-    for file in os.listdir(PROCESSED_FOLDER):
-        if not file.startswith(subject):
-            continue
+    question = question.lower()
+    words = question.split()
 
-        with open(os.path.join(PROCESSED_FOLDER, file), "r", encoding="utf-8") as f:
-            data = json.load(f)
+    matched_sentences = []
 
-        for page in data["pages"]:
-            page_text_clean = clean_text(page["text"])
+    sentences = text.split(".")
 
-            match_count = sum(1 for k in keywords if k in page_text_clean)
-            score = match_count / len(keywords)
+    for sentence in sentences:
+        for word in words:
+            if word in sentence:
+                matched_sentences.append(sentence.strip())
+                break
 
-            if score > best_score:
-                best_score = score
-                best_match = {
-                    "answer": page["text"],
-                    "file": data["file_name"],
-                    "page": page["page"],
-                    "confidence": calculate_confidence(score)
-                }
-
-    if best_score < MATCH_THRESHOLD:
+    if not matched_sentences:
         return None
 
-    return best_match
-
-
-def calculate_confidence(score):
-    if score >= 0.75:
-        return "high"
-    elif score >= 0.5:
-        return "medium"
-    else:
-        return "low"
+    return ". ".join(matched_sentences[:3])
